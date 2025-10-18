@@ -60,6 +60,56 @@ const trackedPlayers = ref([]);
 const lastPriceRefresh = ref();
 const priceTrackerLoading = ref(false);
 
+const DEFAULT_THEME = Object.freeze({
+    primaryColor: '#3091ae',
+    secondaryColor: '#5b51ae'
+});
+
+const resolveRuntimeError = (runtimeError) => {
+    if (!runtimeError) {
+        return null;
+    }
+
+    const message = runtimeError.message || '';
+    if (message.includes('Receiving end does not exist')) {
+        return {type: 'noReceiver', error: runtimeError};
+    }
+
+    return {type: 'generic', error: runtimeError};
+};
+
+const sendMessageToActiveTab = async (payload) => {
+    try {
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        if (!tab?.id) {
+            console.warn('No active tab found for message', payload?.action);
+            return {ok: false, reason: 'no-tab'};
+        }
+
+        return await new Promise((resolve) => {
+            chrome.tabs.sendMessage(tab.id, payload, (response) => {
+                const runtimeError = resolveRuntimeError(chrome.runtime.lastError);
+                if (runtimeError) {
+                    if (runtimeError.type === 'noReceiver') {
+                        console.info(`Content script unavailable for ${payload?.action || 'message'}`);
+                        resolve({ok: false, reason: 'no-receiver'});
+                        return;
+                    }
+
+                    console.error('Failed to deliver message to active tab', runtimeError.error);
+                    resolve({ok: false, reason: 'runtime-error', error: runtimeError.error});
+                    return;
+                }
+
+                resolve({ok: true, response: response});
+            });
+        });
+    } catch (error) {
+        console.error('Unexpected error while sending message to active tab', payload, error);
+        return {ok: false, reason: 'exception', error};
+    }
+};
+
 const tabs = [
     {id: 'autobuyer', label: 'Autobuyer'},
     {id: 'watchlist', label: 'Watchlist'},
@@ -474,14 +524,7 @@ const onPlayerInputChange = async (newValue) => {
     playerName.value = newValue
     await chrome.storage.local.set({name: newValue}, function () {
     });
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'inputChange', value: playerName.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'inputChange', value: playerName.value});
 }
 
 /**
@@ -515,14 +558,7 @@ const onMinBuyNowChange = async (newValue) => {
     minBuyNow.value = newValue;
     chrome.storage.local.set({minBuyNow: newValue}, function () {
     });
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'minBuyNowChange', value: minBuyNow.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'minBuyNowChange', value: minBuyNow.value});
 }
 
 /**
@@ -534,14 +570,7 @@ const onMaxBuyNowChange = async (newValue) => {
     maxBuyNow.value = newValue;
     chrome.storage.local.set({maxBuyNow: newValue}, function () {
     });
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'maxBuyNowChange', value: maxBuyNow.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'maxBuyNowChange', value: maxBuyNow.value});
 
     // Updates the profit display based on the calculated profit
     if (maxBuyNow.value && maxListPrice.value) {
@@ -560,14 +589,7 @@ const onPlayerSelected = async (newValue) => {
     playerName.value = newValue
     await chrome.storage.local.set({name: newValue}, function () {
     });
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'playerSelected', value: playerName.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'playerSelected', value: playerName.value});
 }
 
 /**
@@ -664,14 +686,7 @@ const onSliderValueChange = async (newValue) => {
     rpm.value = newValue;
     chrome.storage.local.set({rpm: newValue}, function () {
     });
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'rpmChange', value: rpm.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'rpmChange', value: rpm.value});
 }
 
 /**
@@ -681,14 +696,7 @@ const onSliderValueChange = async (newValue) => {
  */
 const onSearchResultDelayChange = async (newValue) => {
     searchResultDelay.value = newValue;
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'searchResultDelay', value: searchResultDelay.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'searchResultDelay', value: searchResultDelay.value});
 }
 
 /**
@@ -698,14 +706,7 @@ const onSearchResultDelayChange = async (newValue) => {
  */
 const onConfirmDialogDelayChange = async (newValue) => {
     confirmDialogDelay.value = newValue;
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'confirmDialogDelay', value: confirmDialogDelay.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'confirmDialogDelay', value: confirmDialogDelay.value});
 }
 
 /**
@@ -715,14 +716,7 @@ const onConfirmDialogDelayChange = async (newValue) => {
  */
 const onCheckPurchaseDelayChange = async (newValue) => {
     confirmPurchaseDelay.value = newValue;
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'confirmPurchaseDelay', value: confirmDialogDelay.value});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'confirmPurchaseDelay', value: confirmDialogDelay.value});
 }
 
 /**
@@ -742,32 +736,34 @@ const eaAfterTax = (buyPrice, listPrice) => {
  */
 const startSearch = async () => {
     running.value = true;
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
+    const result = await sendMessageToActiveTab({
+        action: 'startSearch',
+        searchLimit: searchLimit.value,
+        purchaseLimit: purchaseLimit.value,
+        rpm: rpm.value,
+        checked: autoListChecked.value,
+        minList: minListPrice.value,
+        maxList: maxListPrice.value,
+        searchResultDelay: searchResultDelay.value,
+        confirmDialogDelay: confirmDialogDelay.value,
+        confirmPurchaseDelay: confirmPurchaseDelay.value
     });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {
-            action: 'startSearch',
-            searchLimit: searchLimit.value,
-            purchaseLimit: purchaseLimit.value,
-            rpm: rpm.value,
-            checked: autoListChecked.value,
-            minList: minListPrice.value,
-            maxList: maxListPrice.value,
-            searchResultDelay: searchResultDelay.value,
-            confirmDialogDelay: confirmDialogDelay.value,
-            confirmPurchaseDelay: confirmPurchaseDelay.value
-        });
-        logList.value.push(`[${new Date().toLocaleString()}] Bot started`);
-        if (canTrackPrice.value) {
-            sendTrackPlayerMessage(true).then((result) => {
-                if (result.success) {
-                    requestTrackedPlayers();
-                }
-            });
+
+    if (!result.ok) {
+        running.value = false;
+        if (result.reason !== 'no-receiver') {
+            pushLogEntry('Unable to reach the active tab to start the bot.');
         }
-    } else {
-        console.error("No active tab found. ")
+        return;
+    }
+
+    logList.value.push(`[${new Date().toLocaleString()}] Bot started`);
+    if (canTrackPrice.value) {
+        sendTrackPlayerMessage(true).then((response) => {
+            if (response.success) {
+                requestTrackedPlayers();
+            }
+        });
     }
 }
 
@@ -776,14 +772,7 @@ const startSearch = async () => {
  */
 const stopSearch = async () => {
     running.value = false;
-    let [tab] = await chrome.tabs.query({
-        active: true, currentWindow: true
-    });
-    if (tab) {
-        chrome.tabs.sendMessage(tab.id, {action: 'stopSearch'});
-    } else {
-        console.error("No active tab found. ")
-    }
+    await sendMessageToActiveTab({action: 'stopSearch'});
 }
 
 /**
@@ -792,13 +781,23 @@ const stopSearch = async () => {
  * @param {string} primaryColor - The primary theme color.
  * @param {string} secondaryColor - The secondary theme color.
  */
-const changeThemeColors = (primaryColor, secondaryColor) => {
+const applyThemeColors = (primaryColor, secondaryColor, persist = false) => {
+    if (!primaryColor || !secondaryColor) {
+        return;
+    }
+
     document.documentElement.style.setProperty('--primary-color', primaryColor);
     document.documentElement.style.setProperty('--secondary-color', secondaryColor);
-    const colorTheme = {primaryColor: primaryColor, secondaryColor: secondaryColor}
-    chrome.storage.local.set({theme: colorTheme}, function () {
-        console.log('Theme colors is saved to local storage.');
-    });
+
+    if (persist) {
+        chrome.storage.local.set({theme: {primaryColor, secondaryColor}}, function () {
+            console.log('Theme colors saved to local storage.');
+        });
+    }
+};
+
+const changeThemeColors = (primaryColor, secondaryColor) => {
+    applyThemeColors(primaryColor, secondaryColor, true);
 };
 
 /**
@@ -808,14 +807,13 @@ const changeThemeColors = (primaryColor, secondaryColor) => {
 onMounted(async () => {
     // Retrieve the 'theme' object from Chrome storage
     chrome.storage.local.get(['theme'], function (result) {
-        if (result.theme) {
+        if (result.theme?.primaryColor && result.theme?.secondaryColor) {
             const {primaryColor, secondaryColor} = result.theme;
-            // Apply the theme colors to CSS variables
-            document.documentElement.style.setProperty('--primary-color', primaryColor);
-            document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+            applyThemeColors(primaryColor, secondaryColor);
             console.log('Theme loaded and applied:', primaryColor, secondaryColor);
         } else {
-            console.error('No theme found in storage.');
+            applyThemeColors(DEFAULT_THEME.primaryColor, DEFAULT_THEME.secondaryColor, true);
+            console.log('Default theme applied.');
         }
     });
 
