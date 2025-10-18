@@ -86,6 +86,7 @@ async function compileVueModule(filePath) {
     const vueNamespaces = new Set();
     const vueNamedImports = new Map();
     const moduleImportLines = [];
+    const componentImportNames = new Set();
 
     for (const entry of imports) {
         const {bindings, specifier} = entry;
@@ -114,6 +115,7 @@ async function compileVueModule(filePath) {
             }
             if (bindingInfo.defaultName) {
                 moduleImportLines.push(`const ${bindingInfo.defaultName} = __require('${dependencyId}').default;`);
+                componentImportNames.add(bindingInfo.defaultName);
             }
             if (bindingInfo.named.length) {
                 const destructured = bindingInfo.named
@@ -137,7 +139,8 @@ async function compileVueModule(filePath) {
             filename: absolutePath,
             source: descriptor.template.content,
             scoped: hasScopedStyles,
-            compilerOptions: hasScopedStyles ? {scopeId} : {}
+            compilerOptions: hasScopedStyles ? {scopeId} : {},
+            bindingMetadata: script.bindings
         });
         const templateImports = [];
         let templateCode = template.code.replace(importRegex, (match, bindings, specifier) => {
@@ -185,6 +188,14 @@ async function compileVueModule(filePath) {
         }
 
         cssChunks.push(styleResult.code);
+    }
+
+    if (componentImportNames.size) {
+        const registrations = Array.from(componentImportNames)
+            .sort()
+            .map((name) => `'${name}': ${name}`)
+            .join(', ');
+        moduleCode += `\n__sfc__.components = Object.assign({}, __sfc__.components, { ${registrations} });`;
     }
 
     moduleCode += `\nmodule.exports.default = __sfc__;\n`;

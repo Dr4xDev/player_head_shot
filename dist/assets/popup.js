@@ -592,6 +592,7 @@ function render(_ctx, _cache) {
 }
 __sfc__.render = render;
 __sfc__.__scopeId = 'data-v-90704ee048158b817fe8f97d7c6f7422';
+__sfc__.components = Object.assign({}, __sfc__.components, { 'CustomLi': CustomLi });
 module.exports.default = __sfc__;
 
 });
@@ -2494,6 +2495,7 @@ function render(_ctx, _cache) {
 }
 __sfc__.render = render;
 __sfc__.__scopeId = 'data-v-0d1c0cf702348b0f824eb70579d8ba63';
+__sfc__.components = Object.assign({}, __sfc__.components, { 'AutoListCheckBox': AutoListCheckBox, 'CustomButton': CustomButton, 'CustomInput': CustomInput, 'CustomLog': CustomLog, 'CustomSlider': CustomSlider, 'PlayerInput': PlayerInput, 'SnipingResults': SnipingResults, 'ThemeColorButton': ThemeColorButton });
 module.exports.default = __sfc__;
 
 });
