@@ -3,7 +3,13 @@
   "name": "PlayerHeadShot",
   "version": "2.0",
   "description": "Free EAFC 26 Sniper Bot",
-  "permissions": ["storage", "tabs", "activeTab", "scripting"],
+  "permissions": ["storage", "tabs", "activeTab", "scripting", "alarms"],
+  "host_permissions": [
+    "https://www.futbin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "./src/popup.html"
   },
